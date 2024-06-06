@@ -4,6 +4,7 @@
 
 #define MAX_STATES 100
 #define MAX_TRANSITIONS 500
+#define MAX_WORDS 100
 #define MAX_STACK_SIZE 100
 #define MAX_SYMBOL_LENGTH 10
 
@@ -182,28 +183,80 @@ void generateDotFile(Automaton *automaton, const char *filename) {
     fclose(file);
 }
 
+void readAutomatonFromFile(Automaton *automaton, const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        printf("Erro ao abrir o arquivo do autômato.\n");
+        return;
+    }
+
+    char line[256];
+    while (fgets(line, sizeof(line), file)) {
+        if (strncmp(line, "initial_state:", 14) == 0) {
+            automaton->initialState = atoi(line + 15);
+        } else if (strncmp(line, "final_states:", 13) == 0) {
+            char *token = strtok(line + 14, ",");
+            while (token != NULL) {
+                int state = atoi(token);
+                addState(automaton, state, 1);
+                token = strtok(NULL, ",");
+            }
+        } else if (strncmp(line, "states:", 7) == 0) {
+            char *token = strtok(line + 8, ",");
+            while (token != NULL) {
+                int state = atoi(token);
+                addState(automaton, state, 0);
+                token = strtok(NULL, ",");
+            }
+        } else if (strncmp(line, "transitions:", 12) == 0) {
+            while (fgets(line, sizeof(line), file)) {
+                int fromState, toState;
+                char readSymbol, popSymbol, pushSymbol[MAX_SYMBOL_LENGTH];
+                sscanf(line, "%d,%c,%c,%[^,],%d", &fromState, &readSymbol, &popSymbol, pushSymbol, &toState);
+                addTransition(automaton, fromState, readSymbol, popSymbol, pushSymbol, toState);
+            }
+        }
+    }
+
+    fclose(file);
+}
+
+void readWordsFromFile(char *words[], int *wordCount, const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        printf("Erro ao abrir o arquivo de palavras.\n");
+        return;
+    }
+
+    char line[256];
+    *wordCount = 0;
+    while (fgets(line, sizeof(line), file) && *wordCount < MAX_WORDS) {  // Usando MAX_WORDS aqui
+        line[strcspn(line, "\n")] = '\0';  // Remove o caractere de nova linha
+        words[*wordCount] = strdup(line); //Armazena o ponteiro da nova string no array words
+        (*wordCount)++;
+    }
+
+    fclose(file);
+}
+
+
 int main() {
     Automaton automaton;
     initAutomaton(&automaton);
 
-    // Configuração do autômato de exemplo
-    automaton.initialState = 0;
-    addState(&automaton, 0, 0);
-    addState(&automaton, 1, 1);
+    // Ler autômato do arquivo
+    readAutomatonFromFile(&automaton, "automaton.txt");
 
-    addTransition(&automaton, 0, 'a', '$', "$A", 0);
-    addTransition(&automaton, 0, 'a', 'A', "AA", 0);
-    addTransition(&automaton, 0, 'b', 'A', "", 1);
-    addTransition(&automaton, 1, 'b', 'A', "", 1);
-    addTransition(&automaton, 1, '\0', '$', "", 1);
+    // Ler palavras do arquivo
+    char *words[MAX_TRANSITIONS];
+    int wordCount;
+    readWordsFromFile(words, &wordCount, "words.txt");
 
-    // Palavras para testar
-    char *words[] = {"aabbb", "ab", "aaabb", "aabbbb"};
-    int wordCount = 4;
-
+    // Processar palavras
     for (int i = 0; i < wordCount; i++) {
         int result = processWord(&automaton, words[i]);
         printf("A palavra '%s' é %s pelo autômato.\n", words[i], result ? "aceita" : "rejeitada");
+        free(words[i]);  // Liberar memória alocada
     }
 
     // Gerar o arquivo DOT

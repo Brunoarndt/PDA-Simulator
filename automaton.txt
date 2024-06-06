@@ -1,0 +1,9 @@
+initial_state: 0
+final_states: 1
+states: 0,1
+transitions:
+0,a,$,$A,0
+0,a,A,AA,0
+0,b,A,,1
+1,b,A,,1
+1,E,$,,1
